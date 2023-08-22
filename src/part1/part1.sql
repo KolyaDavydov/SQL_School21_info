@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS Tasks(
 		- Success - успешное окончание проверки
 		- Failure - неудачное окончание проверки
  * */
+
 CREATE TYPE check_status AS ENUM ('Start', 'Success', 'Failure');
 
 /*
@@ -90,16 +91,12 @@ CREATE TABLE IF NOT EXISTS Verter(
 		- Ник проверяющего пира
 		- Ник проверяемого пира
 		- Количество переданных пир поинтов за всё время (только от проверяемого к проверяющему)
-При каждой P2P проверке проверяемый пир передаёт один пир поинт проверяющему.
-Эта таблица содержит все пары проверяемый-проверяющий и кол-во переданных
-пир поинтов, то есть, другими словами, количество P2P проверок указанного
-проверяемого пира, данным проверяющим.
  * */
 CREATE TABLE IF NOT EXISTS TransferredPoints(
-	ID			integer	PRIMARY KEY,
-	CheckingPeer varchar,
-	CheckedPeer	varchar,
-	PointsAmount integer,
+	ID integer PRIMARY KEY,
+	CheckingPeer	varchar,
+	CheckedPeer		varchar,
+	PointsAmount	integer,
 	
     FOREIGN KEY (CheckingPeer)	REFERENCES Peers (Nickname),
     FOREIGN KEY (CheckedPeer)	REFERENCES Peers (Nickname)
@@ -110,7 +107,6 @@ CREATE TABLE IF NOT EXISTS TransferredPoints(
 		- ID
 		- Ник первого пира
 		- Ник второго пира
-Дружба взаимная, т.е. первый пир является другом второго,а второй -- другом первого.
  * */
 CREATE TABLE IF NOT EXISTS Friends(
 	ID		integer	PRIMARY KEY,
@@ -126,10 +122,6 @@ CREATE TABLE IF NOT EXISTS Friends(
 		- ID
 		- Ник пира
 		- Ник пира, к которому рекомендуют идти на проверку
-Каждому может понравиться, как проходила P2P проверка у того или итого пира.
-Пир, указанный в поле Peer, рекомендует проходить P2P проверку у пира
-из поля RecomendedPeer. Каждый пир может рекомендовать как ни одного,
-так и сразу несколько проверяющих.
  * */
 
 CREATE TABLE IF NOT EXISTS Recommendations(
@@ -146,10 +138,6 @@ CREATE TABLE IF NOT EXISTS Recommendations(
 		- ID
 		- ID проверки
 		- Количество полученного XP
-За каждую успешную проверку пир, выполнивший задание, получает какое-то количество
-XP, отображаемое в этой таблице. Количество XP не может превышать
-максимальное доступное для проверяемой задачи.
-Первое поле этой таблицы может ссылаться только на успешные проверки.
  * */
 CREATE TABLE IF NOT EXISTS XP(
 	ID			integer	PRIMARY KEY,
@@ -166,9 +154,6 @@ CREATE TABLE IF NOT EXISTS XP(
 		- Дата
 		- Время
 		- Состояние (1 - пришел, 2 - вышел)
-Данная таблица содержит информация о посещениях пирами кампуса.
-Когда пир входит в кампус, в таблицу добавляется запись с состоянием 1,
-когда покидает - с состоянием 2.
  * */
 CREATE TABLE IF NOT EXISTS TimeTracking(
 	ID 		integer	PRIMARY KEY,
@@ -226,12 +211,12 @@ INSERT INTO Tasks (title, parenttask,maxxp)
 не относятся ни к успешным, ни к неуспешным.
 */
 INSERT INTO Checks(id, peer, task, date) VALUES
-		(1, 'name_1', 'C2_SimpleBashUtils', '2022-01-01'), -- пир успешно, вертер фэйл
-		(2, 'name_1', 'C2_SimpleBashUtils', '2022-01-02'), -- пир успешно, вертер успешно
-		(3, 'name_2', 'C2_SimpleBashUtils', '2022-02-01'), -- пир фэйл
-		(4, 'name_2', 'C2_SimpleBashUtils', '2022-02-02'), -- пир успешно, вертер успешно
-		(5, 'name_1', 'C3_s21_string+', '2022-03-01'), -- пир успешно, вертер успешно
-		(6, 'name_1', 'C4_s21_math', '2022-03-10'); -- пир успешно, вертер успешно
+		(1, 'name_1', 'C2_SimpleBashUtils', '2023-01-01'), -- пир успешно, вертер фэйл
+		(2, 'name_1', 'C2_SimpleBashUtils', '2023-01-02'), -- пир успешно, вертер успешно
+		(3, 'name_2', 'C2_SimpleBashUtils', '2023-02-01'), -- пир фэйл
+		(4, 'name_2', 'C2_SimpleBashUtils', '2023-02-02'), -- пир успешно, вертер успешно
+		(5, 'name_1', 'C3_s21_string+', '2023-03-01'), -- пир успешно, вертер успешно
+		(6, 'name_1', 'C4_s21_math', '2023-03-10'); -- пир успешно, вертер успешно
 
 /* P2P
 Каждая P2P проверка состоит из 2-х записей в таблице:
@@ -240,7 +225,6 @@ INSERT INTO Checks(id, peer, task, date) VALUES
 ссылается на проверку в таблице Checks, к которой она относится.
 */
 INSERT INTO p2p (id, "Check", checkingpeer, state, time) VALUES
-		
 		(1, 1, 'name_5', 'Start', '08:00:00'),
 		(2, 1, 'name_5', 'Success', '08:20:00'), -- В вертер (id=2 будет фэйл)
 		(3, 2, 'name_3', 'Start', '08:00:00'),
@@ -274,3 +258,72 @@ INSERT INTO verter (id, "Check", state, "time") VALUES
 		(8, 5, 'Success', '08:21:00'),
 		(9, 6, 'Start', '08:20:00'),
 		(10, 6, 'Success', '08:21:00');
+
+/* TRANSFEREDPOINTS
+ При каждой P2P проверке проверяемый пир передаёт один пир поинт проверяющему.
+Эта таблица содержит все пары проверяемый-проверяющий и кол-во переданных
+пир поинтов, то есть, другими словами, количество P2P проверок указанного
+проверяемого пира, данным проверяющим.
+ * */
+-- временную таблицу создаем
+CREATE TEMP TABLE tmp (Checkingpeer varchar , checkedpeer varchar , PointsAmount int);
+--вставляем туда вычесленные данные без ID
+INSERT INTO tmp(
+	SELECT checkingpeer, Peer, count(*) from P2P
+	JOIN Checks ON Checks.ID = P2P."Check"
+	WHERE State != 'Start'
+	GROUP BY 1,2
+);
+ALTER TABLE tmp  ADD COLUMN id serial; -- вставка колонки с числами от 1
+-- вставляем непосредственно данные
+INSERT INTO transferredpoints (id, checkingpeer, checkedpeer, pointsamount)
+	(SELECT id, checkingpeer, checkedpeer, pointsamount FROM tmp);
+DROP TABLE tmp;
+
+/* FRIENDS
+Дружба взаимная, т.е. первый пир является другом второго,а второй - другом первого.
+ * */
+INSERT INTO Friends (ID, Peer1, Peer2)
+VALUES (1, 'name_1', 'name_2'),
+       (2, 'name_2', 'name_3'),
+       (3, 'name_3', 'name_4'),
+       (4, 'name_4', 'name_5'),
+       (5, 'name_5', 'name_1');
+       
+/* RECOMMENADIONS
+Каждому может понравиться, как проходила P2P проверка у того или итого пира.
+Пир, указанный в поле Peer, рекомендует проходить P2P проверку у пира
+из поля RecomendedPeer. Каждый пир может рекомендовать как ни одного,
+так и сразу несколько проверяющих.
+ * */
+INSERT INTO recommendations  (id, peer, recommendedpeer)
+VALUES (1, 'name_1', 'name_5'),
+       (2, 'name_1', 'name_3'),
+       (3, 'name_1', 'name_2'),
+       (4, 'name_2', 'name_3'),
+       (5, 'name_2', 'name_4');
+       
+/* XP
+За каждую успешную проверку пир, выполнивший задание, получает какое-то количество
+XP, отображаемое в этой таблице. Количество XP не может превышать
+максимальное доступное для проверяемой задачи.
+Первое поле этой таблицы может ссылаться только на успешные проверки.
+ * */
+INSERT INTO XP (id, "Check", xpamount) VALUES
+		(1, 2, 210),
+		(2, 4, 230),
+		(3, 5, 490),
+		(4, 6, 300);
+
+/* TIMETRACKING
+Данная таблица содержит информация о посещениях пирами кампуса.
+Когда пир входит в кампус, в таблицу добавляется запись с состоянием 1,
+когда покидает - с состоянием 2.
+ * */
+INSERT INTO timetracking (id, peer, date, time, state) VALUES
+		(1, 'name_1', '2023-01-01', '07:30:00', 1),
+		(2, 'name_1', '2023-01-01', '17:30:00', 2),
+		(3, 'name_2', '2023-02-01', '07:30:00', 1),
+		(4, 'name_2', '2023-02-01', '17:30:00', 2),
+		(5, 'name_2', '2023-02-03', '07:30:00', 1),
+		(6, 'name_2', '2023-02-03', '10:34:17', 2);
