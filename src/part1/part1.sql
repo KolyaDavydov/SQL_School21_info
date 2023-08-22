@@ -327,3 +327,36 @@ INSERT INTO timetracking (id, peer, date, time, state) VALUES
 		(4, 'name_2', '2023-02-01', '17:30:00', 2),
 		(5, 'name_2', '2023-02-03', '07:30:00', 1),
 		(6, 'name_2', '2023-02-03', '10:34:17', 2);
+
+
+
+--ЭКСПОРТ и ИМПОРТ ТАБЛИЦ
+--!!! ВАЖНО!!! в названии пути и файла НЕ должно быть киррилицы иначе возможна ошибка "No such file or directory"
+--Процедура экспорта(название таблицы, полный путь с названием конечного файла, разделитель)
+CREATE OR REPLACE PROCEDURE export(tablename varchar, path text, separator char) AS $$
+    BEGIN
+	    -- EXECUTE - динамическое формирование команды внутри функции
+	    -- FORMAT - Форматирует аргумент в соответствии со строкой формата. Эта функция работает подобно sprintf в языке C.
+        EXECUTE format(
+        		'COPY %s TO ''%s'' DELIMITER ''%s'' CSV HEADER;',
+            	tablename,
+            	path,
+            	separator
+     	);
+    END;
+$$ LANGUAGE plpgsql;
+
+--Процедура импорта(название таблицы какое будет, поный путь названия CSV файла, разделитель)
+CREATE OR REPLACE PROCEDURE import(tablename varchar, path text, separator char) AS $$
+    BEGIN
+        EXECUTE format(
+        	'COPY %s FROM ''%s'' DELIMITER ''%s'' CSV HEADER;',
+            tablename,
+           	path,
+          	separator
+      	);
+    END;
+$$ LANGUAGE plpgsql;
+
+--пример экспорта таблицы в CSV Файл:
+--CALL export('peers', 'C:\Nikolay\CSV\peers.csv', ',');
