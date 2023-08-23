@@ -88,3 +88,30 @@ $$ LANGUAGE plpgsql;
 -- 	CALL proc_count_out_of_campus(360, 1, 'refcurs');
 -- 	FETCH ALL FROM "refcurs";
 -- END;
+
+
+/* 3-15. Определить пиров, приходивших раньше заданного времени не менее N раз за всё время
+Параметры процедуры: время, количество раз N. 
+Формат вывода: список пиров
+*/
+DROP PROCEDURE IF EXISTS proc_peer_come_before CASCADE;
+CREATE OR REPLACE PROCEDURE proc_peer_come_before(T time, M int, refcurs REFCURSOR DEFAULT 'refcurs')
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			SELECT peer
+			FROM (SELECT
+					peer,
+					count(state) AS counts
+				FROM timetracking
+				WHERE state = 1 AND time < T
+				GROUP BY peer) AS come_peer
+			WHERE counts >= M;
+	END;
+$$ LANGUAGE plpgsql;
+
+-- вызов процедуры для проверки 3.15
+-- BEGIN;
+--	 CALL proc_peer_come_before('09:00:00'::time, 1);
+--	 FETCH ALL FROM "refcurs";
+-- END;
