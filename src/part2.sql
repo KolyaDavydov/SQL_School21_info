@@ -57,11 +57,11 @@ BEGIN
         SELECT "Check" AS check_id, max(P2P.time)
         FROM P2P
         JOIN Checks AS c
-            ON  c.Task = task_name
+            ON  p2p."Check" = c.id
             AND c.Peer = checking
-        WHERE P2P.state = 'Success'
+        WHERE P2P.state = 'Success' AND c.Task = task_name
         GROUP BY check_id
-        ORDER BY 1 DESC
+        ORDER BY 1, 2 DESC
         LIMIT 1
     )
     INSERT INTO Verter VALUES (
@@ -72,3 +72,28 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION fnc_trg_transfer_peer_point()
+RETURNS TRIGGER AS $trg_transfer_peer_point$
+    BEGIN 
+        WITH peer AS (
+            SELECT Peer, max(P2P.time)
+            FROM Checks
+            JOIN P2P
+            ON NEW."Check" = Checks.id
+            GROUP BY Checks.id
+            ORDER BY 1 DESC
+            LIMIT 1
+        )
+        UPDATE TransferredPoints
+        SET PointsAmount = PointsAmount + 1
+        WHERE CheckedPeer = NEW.CheckingPeer AND CheckingPeer = (SELECT Peer FROM peer);
+        RETURN NULL;
+    END;
+$trg_transfer_peer_point$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_transfer_peer_point
+AFTER INSERT ON p2p
+FOR EACH ROW
+WHEN (NEW.State = 'Start')
+EXECUTE FUNCTION fnc_trg_transfer_peer_point();
