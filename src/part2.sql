@@ -61,7 +61,7 @@ BEGIN
             AND c.Peer = checking
         WHERE P2P.state = 'Success' AND c.Task = task_name
         GROUP BY check_id
-        ORDER BY 1, 2 DESC
+        ORDER BY 1 DESC, 2 DESC
         LIMIT 1
     )
     INSERT INTO Verter VALUES (
