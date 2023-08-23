@@ -97,3 +97,38 @@ AFTER INSERT ON p2p
 FOR EACH ROW
 WHEN (NEW.State = 'Start')
 EXECUTE FUNCTION fnc_trg_transfer_peer_point();
+
+CREATE OR REPLACE FUNCTION fnc_trg_check_xp()
+RETURNS TRIGGER AS $trg_check_xp$
+    DECLARE
+        is_successfull INTEGER;
+        task_max_xp INTEGER;
+    BEGIN
+        SELECT count(*)
+        FROM verter AS v
+        INTO is_successfull
+        JOIN p2p
+            ON v."Check" = p2p."Check"
+        WHERE v.State = 'Success' AND p2p.State = 'Success' AND p2p."Check" = NEW."Check";
+
+        SELECT maxxp
+        FROM checks AS c
+        INTO task_max_xp
+        JOIN tasks
+            ON c.Task = tasks.Title
+        JOIN p2p
+            ON c.id = p2p."Check"
+        WHERE p2p.State = 'Success' AND p2p."Check" = NEW."Check";
+
+        IF (is_successfull = 1 AND NEW.XPAmount <= task_max_xp) THEN
+            RETURN NEW;
+        END IF;
+
+        RETURN NULL;
+    END;
+$trg_check_xp$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_trg_check_xp
+BEFORE INSERT ON xp
+FOR EACH ROW
+EXECUTE FUNCTION fnc_trg_check_xp();
