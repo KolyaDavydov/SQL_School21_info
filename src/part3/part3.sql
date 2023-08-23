@@ -4,6 +4,7 @@
 Для каждого месяца посчитать процент ранних входов в кампус относительно общего числа входов. 
 Формат вывода: месяц, процент ранних входов
  * */
+DROP PROCEDURE IF EXISTS proc_percent_of_entry_early CASCADE;
 CREATE OR REPLACE PROCEDURE proc_percent_of_entry_early(refcurs REFCURSOR)
 AS $$
 	BEGIN
@@ -54,7 +55,36 @@ $$ LANGUAGE plpgsql;
 -- вызов процедуры с курсором в качестве аргумента должен выполнятся обязательно в одной транзакции
 -- FETCH получить результат запроса через курсор
 -- курсор посути ссылка на область памяти где храниться результат запроса
-BEGIN;
-	CALL proc_percent_of_entry_early('refcurs');
-	FETCH ALL FROM "refcurs";
-END;
+-- BEGIN;
+-- 	CALL proc_percent_of_entry_early('refcurs');
+-- 	FETCH ALL FROM "refcurs";
+-- END;
+
+
+/* 3-16. Определить пиров, выходивших за последние N дней из кампуса больше M раз
+Параметры процедуры: количество дней N, количество раз M. 
+Формат вывода: список пиров
+*/
+DROP PROCEDURE IF EXISTS proc_count_out_of_campus CASCADE;
+CREATE OR REPLACE PROCEDURE proc_count_out_of_campus(N int, M int, refcurs REFCURSOR)
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			WITH left_campus AS (
+				SELECT 
+					peer,
+					date
+				FROM timetracking
+				WHERE state = 2 AND (current_date - date) < N
+				GROUP BY peer, date)
+			SELECT peer FROM left_campus
+			GROUP BY peer
+			HAVING count(peer) > M;
+	END;
+$$ LANGUAGE plpgsql;
+
+-- вызов процедуры для проверки 3.16
+-- BEGIN;
+-- 	CALL proc_count_out_of_campus(360, 1, 'refcurs');
+-- 	FETCH ALL FROM "refcurs";
+-- END;
