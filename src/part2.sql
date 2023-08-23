@@ -23,9 +23,20 @@ BEGIN
             time
         );
     ELSE
+        WITH last_started_check AS (
+            SELECT c.id AS check_id, max(P2P.time)
+            FROM P2P
+            JOIN Checks AS c
+                ON  c.Task = task_name
+                AND c.Peer = checking
+            WHERE P2P.state = 'Start'
+            GROUP BY check_id
+            ORDER BY 1 DESC
+            LIMIT 1
+        )
         INSERT INTO P2P VALUES (
             (SELECT count(*) + 1 FROM P2P),
-            (SELECT "Check" FROM P2P WHERE CheckingPeer = checker AND State = 'Start'),
+            (SELECT lsc.check_id FROM last_started_check AS lsc),
             checker,
             p2p_status,
             time
@@ -43,17 +54,19 @@ CREATE OR REPLACE PROCEDURE add_verter_check(
 AS $$
 BEGIN
     WITH last_successfull_check AS (
-        SELECT "Check", max(P2P.time)
+        SELECT "Check" AS check_id, max(P2P.time)
         FROM P2P
         JOIN Checks AS c
             ON  c.Task = task_name
             AND c.Peer = checking
         WHERE P2P.state = 'Success'
-        GROUP BY "Check"
+        GROUP BY check_id
+        ORDER BY 1 DESC
+        LIMIT 1
     )
     INSERT INTO Verter VALUES (
         (SELECT count(*) + 1 FROM Verter),
-        (SELECT "Check" FROM last_successfull_check),
+        (SELECT lsc.check_id FROM last_successfull_check AS lsc),
         verter_status,
         time
     );
