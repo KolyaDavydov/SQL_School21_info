@@ -128,7 +128,7 @@ RETURNS TRIGGER AS $trg_check_xp$
     END;
 $trg_check_xp$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_trg_check_xp
+CREATE TRIGGER trg_check_xp
 BEFORE INSERT ON xp
 FOR EACH ROW
 EXECUTE FUNCTION fnc_trg_check_xp();
