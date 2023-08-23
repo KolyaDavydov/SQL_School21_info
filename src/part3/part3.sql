@@ -115,3 +115,27 @@ $$ LANGUAGE plpgsql;
 --	 CALL proc_peer_come_before('09:00:00'::time, 1);
 --	 FETCH ALL FROM "refcurs";
 -- END;
+
+/* 3-14. Определить пира с наибольшим количеством XP
+Формат вывода: ник пира, количество XP
+*/
+DROP PROCEDURE IF EXISTS proc_peer_max_xp CASCADE;
+CREATE OR REPLACE PROCEDURE proc_peer_max_xp(refcurs REFCURSOR DEFAULT 'refcurs')
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			SELECT
+				peer,
+				sum(xpamount) AS XP
+			FROM xp
+			JOIN checks ON xp."Check"=checks.id
+			GROUP BY peer
+			ORDER BY XP DESC
+			LIMIT 1;
+	END;
+$$ LANGUAGE plpgsql;
+-- вызов процедуры для проверки 3.14
+-- BEGIN;
+-- 	CALL proc_peer_max_xp();
+-- 	FETCH ALL FROM "refcurs";
+-- END;
