@@ -159,6 +159,7 @@ END;
 -- Приступили только к блоку 2
 -- Приступили к обоим
 -- Не приступили ни к одному
+-- TODO объединить строки по блокам
 
 CREATE OR REPLACE PROCEDURE proc_peer_trabajar_para_dos_blocos(res REFCURSOR) 
 AS $$
@@ -169,15 +170,15 @@ WITH num_peers AS (SELECT COUNT(peers.nickname) as num FROM peers),
                 WHERE task~ CONCAT('^', 'SQL', '[0-9]+_')),
      block2 AS  (SELECT peer, 1 AS block2 FROM checks
                 WHERE task~ CONCAT('^', 'C', '[0-9]+_')),
-     peer_by_block AS (SELECT COALESCE(block1.peer, block2.peer) as peer, block1, block2, 
+     peer_by_block AS (SELECT COALESCE(block1.peer, block2.peer) as peername, block1, block2, 
                        COALESCE(block1.block1, block2.block2) as bothBlock
                        FROM block1
-FULL JOIN block2 ON block1.peer = block2.peer
-GROUP BY block1.peer, block1.block1, block2.peer, block2.block2)
-SELECT count(peer_by_block.block1)*100/num_peers.num, 
-count(peer_by_block.block2)*100/num_peers.num,
-count(peer_by_block.bothBlock)*100/num_peers.num, 
-100-count(peer_by_block.bothBlock)*100/num_peers.num
+FULL  JOIN block2 ON block1.peer = block2.peer
+GROUP BY peername, block1.block1, block2.block2)
+SELECT count(peer_by_block.block1)*100/num_peers.num AS StartedBlock1, 
+count(peer_by_block.block2)*100/num_peers.num AS StartedBlock1, 
+count(peer_by_block.bothBlock)*100/num_peers.num AS StartedBothBlocks, 
+100-count(peer_by_block.bothBlock)*100/num_peers.num AS DidntStartAnyBlock
 FROM peer_by_block,num_peers
 GROUP BY num_peers.num, peer_by_block.block1; 
 END;
@@ -186,6 +187,7 @@ BEGIN;
 CALL proc_peer_trabajar_para_dos_blocos('res');
 FETCH ALL FROM "res";
 END;
+
 -- 10) Определить процент пиров, которые когда-либо успешно проходили проверку в свой день рождения
 
 CREATE OR REPLACE PROCEDURE proc_peer_checks_in_birthday(res REFCURSOR) 
