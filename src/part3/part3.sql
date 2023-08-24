@@ -25,7 +25,6 @@ SELECT *
 FROM fnc_XP_per_project();
 
 -- 3) Функция, определяющая пиров, которые не выходили из кампуса в течение всего дня
--- TODO проверить, может ли пир приходить и уходить в разные дни или стачала уйти, а потом прийти в кампус
 
 CREATE OR REPLACE FUNCTION fnc_noexit_peers_ondate(ondate date) RETURNS TABLE(Peer varchar)
 AS $$ SELECT Peer
@@ -132,7 +131,7 @@ JOIN checks ON p2p."Check" = checks.id
 WHERE state = 'Success';
 
 -- 8) Определить, к какому пиру стоит идти на проверку каждому обучающемуся
--- Для одного пира
+
 CREATE OR REPLACE PROCEDURE proc_recomend_peer_for_checks(res REFCURSOR) 
 AS $$
 BEGIN
@@ -155,6 +154,38 @@ CALL proc_recomend_peer_for_checks('res');
 FETCH ALL FROM "res";
 END;
 
+-- 9) Определить процент пиров, которые:
+-- Приступили только к блоку 1
+-- Приступили только к блоку 2
+-- Приступили к обоим
+-- Не приступили ни к одному
+
+CREATE OR REPLACE PROCEDURE proc_peer_trabajar_para_dos_blocos(res REFCURSOR) 
+AS $$
+BEGIN
+    OPEN res FOR
+WITH num_peers AS (SELECT COUNT(peers.nickname) as num FROM peers),
+     block1 AS (SELECT peer, 1 AS block1 FROM checks
+                WHERE task~ CONCAT('^', 'SQL', '[0-9]+_')),
+     block2 AS  (SELECT peer, 1 AS block2 FROM checks
+                WHERE task~ CONCAT('^', 'C', '[0-9]+_')),
+     peer_by_block AS (SELECT COALESCE(block1.peer, block2.peer) as peer, block1, block2, 
+                       COALESCE(block1.block1, block2.block2) as bothBlock
+                       FROM block1
+FULL JOIN block2 ON block1.peer = block2.peer
+GROUP BY block1.peer, block1.block1, block2.peer, block2.block2)
+SELECT count(peer_by_block.block1)*100/num_peers.num, 
+count(peer_by_block.block2)*100/num_peers.num,
+count(peer_by_block.bothBlock)*100/num_peers.num, 
+100-count(peer_by_block.bothBlock)*100/num_peers.num
+FROM peer_by_block,num_peers
+GROUP BY num_peers.num, peer_by_block.block1; 
+END;
+$$ LANGUAGE plpgsql;
+BEGIN; 
+CALL proc_peer_trabajar_para_dos_blocos('res');
+FETCH ALL FROM "res";
+END;
 -- 10) Определить процент пиров, которые когда-либо успешно проходили проверку в свой день рождения
 
 CREATE OR REPLACE PROCEDURE proc_peer_checks_in_birthday(res REFCURSOR) 
