@@ -191,3 +191,34 @@ $$ LANGUAGE plpgsql;
 --  	CALL proc_lucky_day(1, 'refcurs');
 --  	FETCH ALL FROM "refcurs";
 --  END;
+
+/*3_12. Используя рекурсивное обобщенное табличное выражение, для каждой задачи вывести кол-во предшествующих ей задач
+То есть сколько задач нужно выполнить, исходя из условий входа, чтобы получить доступ к текущей. 
+Формат вывода: название задачи, количество предшествующих
+*/
+DROP PROCEDURE IF EXISTS proc_count_parent_tasks CASCADE;
+CREATE OR REPLACE PROCEDURE proc_count_parent_tasks(refcurs REFCURSOR)
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			WITH RECURSIVE parent AS
+				(SELECT
+					(SELECT	title
+					FROM tasks
+					WHERE parenttask IS NULL) AS Task,
+				0 AS PrevCount
+				UNION ALL
+				SELECT
+					t.title,
+					PrevCount + 1
+				FROM parent p
+				JOIN tasks t ON t."parenttask" = p.Task)
+			SELECT *
+			FROM parent;
+	END;
+$$ LANGUAGE plpgsql;
+-- вызов процедуры для проверки 3.12
+--  BEGIN;
+-- 	CALL proc_count_parent_tasks('refcurs');
+-- 	FETCH ALL FROM "refcurs";
+--  END;
