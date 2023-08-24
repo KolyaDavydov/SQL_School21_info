@@ -79,18 +79,23 @@ END;
 
 -- 6) Определить самое часто проверяемое задание за каждый день
 
-CREATE OR REPLACE PROCEDURE proc_peer_points_change_by_func(res REFCURSOR) 
+CREATE OR REPLACE PROCEDURE proc_most_checked_task(res REFCURSOR) 
 AS $$
 BEGIN
     OPEN res FOR
-        SELECT date AS Day, task AS Task, COUNT(task) 
+        WITH checks_count AS (SELECT date AS Day, task AS Task, COUNT(task) 
         FROM checks
-        GROUP BY date, task;
+        GROUP BY date, task
+        ORDER BY count),
+        sort_checks AS (SELECT Day, Task, ROW_NUMBER() OVER(partition BY Day ORDER BY count DESC) 
+        FROM checks_count)
+        SELECT Day, Task FROM sort_checks
+        WHERE row_number =1;
 END;
 $$ LANGUAGE plpgsql;
 
 -- BEGIN; 
--- CALL proc_peer_points_change_by_func('res');
+-- CALL proc_most_checked_task('res');
 -- FETCH ALL FROM "res";
 -- END;
 
@@ -128,13 +133,27 @@ WHERE state = 'Success';
 
 -- 8) Определить, к какому пиру стоит идти на проверку каждому обучающемуся
 -- Для одного пира
+CREATE OR REPLACE PROCEDURE proc_recomend_peer_for_checks(res REFCURSOR) 
+AS $$
+BEGIN
+    OPEN res FOR
 WITH fr AS (SELECT peer1, peer2 FROM friends
-UNION
-(SELECT peer2 AS peer1, peer2 AS peer1 FROM friends))
-SELECT peer1, recommendedpeer, count(recommendedpeer) FROM fr
-JOIN recommendations ON recommendations.peer = fr.peer1
-GROUP BY fr.peer1, recommendedpeer
-ORDER BY peer1, count DESC;
+            UNION
+            (SELECT peer2 AS peer1, peer2 AS peer1 FROM friends)),
+    rec AS (SELECT peer2, recommendedpeer, count(recommendedpeer) FROM fr
+        JOIN recommendations ON recommendations.peer = fr.peer1
+        GROUP BY fr.peer2, recommendedpeer
+        ORDER BY peer2, count DESC),
+    recom AS (SELECT peer2, recommendedpeer, ROW_NUMBER() OVER(partition BY peer2 ORDER BY count DESC) FROM rec
+        WHERE peer2 != recommendedpeer) 
+    SELECT peer2, recommendedpeer from recom
+    WHERE row_number =1;
+END;
+$$ LANGUAGE plpgsql;
+BEGIN; 
+CALL proc_recomend_peer_for_checks('res');
+FETCH ALL FROM "res";
+END;
 
 -- 10) Определить процент пиров, которые когда-либо успешно проходили проверку в свой день рождения
 
