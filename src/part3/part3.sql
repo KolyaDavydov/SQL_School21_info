@@ -159,34 +159,35 @@ END;
 -- Приступили только к блоку 2
 -- Приступили к обоим
 -- Не приступили ни к одному
--- TODO объединить строки по блокам
+-- TODO проверить откуда вторая строка в итоге без LIMIT
 
-CREATE OR REPLACE PROCEDURE proc_peer_trabajar_para_dos_blocos(res REFCURSOR) 
+CREATE OR REPLACE PROCEDURE proc_peer_trabajar_para_dos_blocos(IN block1_name VARCHAR, block2_name VARCHAR, res REFCURSOR) 
 AS $$
 BEGIN
     OPEN res FOR
 WITH num_peers AS (SELECT COUNT(peers.nickname) as num FROM peers),
      block1 AS (SELECT peer, 1 AS block1 FROM checks
-                WHERE task~ CONCAT('^', 'SQL', '[0-9]+_')),
+                WHERE task~ CONCAT('^', block1_name, '[0-9]+_')),
      block2 AS  (SELECT peer, 1 AS block2 FROM checks
-                WHERE task~ CONCAT('^', 'C', '[0-9]+_')),
+                WHERE task~ CONCAT('^', block2_name, '[0-9]+_')),
      peer_by_block AS (SELECT COALESCE(block1.peer, block2.peer) as peername, block1, block2, 
                        COALESCE(block1.block1, block2.block2) as bothBlock
                        FROM block1
 FULL  JOIN block2 ON block1.peer = block2.peer
 GROUP BY peername, block1.block1, block2.block2)
-SELECT count(peer_by_block.block1)*100/num_peers.num AS StartedBlock1, 
-count(peer_by_block.block2)*100/num_peers.num AS StartedBlock1, 
-count(peer_by_block.bothBlock)*100/num_peers.num AS StartedBothBlocks, 
-100-count(peer_by_block.bothBlock)*100/num_peers.num AS DidntStartAnyBlock
+SELECT Round(CAST(count(peer_by_block.block1) AS NUMERIC)*100/num_peers.num, 0) AS "StartedBlock1", 
+Round(CAST(count(peer_by_block.block2) AS NUMERIC)*100/num_peers.num, 0) AS "StartedBlock2", 
+Round(CAST(count(peer_by_block.bothBlock) AS NUMERIC)*100/num_peers.num, 0) AS "StartedBothBlocks", 
+100-Round(CAST(count(peer_by_block.bothBlock) AS NUMERIC)*100/num_peers.num, 0) AS "DidntStartAnyBlock"
 FROM peer_by_block,num_peers
-GROUP BY num_peers.num, peer_by_block.block1; 
+GROUP BY num_peers.num, peer_by_block.block1 LIMIT 1; 
 END;
 $$ LANGUAGE plpgsql;
-BEGIN; 
-CALL proc_peer_trabajar_para_dos_blocos('res');
-FETCH ALL FROM "res";
-END;
+
+-- BEGIN; 
+-- CALL proc_peer_trabajar_para_dos_blocos('SQL', 'C', 'res');
+-- FETCH ALL FROM "res";
+-- END;
 
 -- 10) Определить процент пиров, которые когда-либо успешно проходили проверку в свой день рождения
 
@@ -206,7 +207,9 @@ BEGIN
         FROM success, failure;
 END;
 $$ LANGUAGE plpgsql;
-BEGIN; 
-CALL proc_peer_checks_in_birthday('res');
-FETCH ALL FROM "res";
-END;
+
+-- BEGIN; 
+-- CALL proc_peer_checks_in_birthday('res');
+-- FETCH ALL FROM "res";
+-- END;
+
