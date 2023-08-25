@@ -213,3 +213,42 @@ $$ LANGUAGE plpgsql;
 -- FETCH ALL FROM "res";
 -- END;
 
+-- 11) Определить всех пиров, которые сдали заданные задания 1 и 2, но не сдали задание 3
+-- TODO можно написать функцию, чтобы сократить одинаковый код
+CREATE OR REPLACE PROCEDURE proc_peer_made_two_tasks_from_tree(IN task1_name VARCHAR, task2_name VARCHAR, task3_name VARCHAR, res REFCURSOR) 
+AS $$
+BEGIN
+    OPEN res FOR
+WITH pr1 AS (SELECT peers.nickname FROM checks 
+        JOIN peers ON checks.peer = peers.nickname
+        JOIN p2p ON p2p."Check" = checks.id
+		FULL JOIN verter ON verter."Check" = checks.id
+		WHERE task =task1_name AND p2p.state = 'Success' 
+		AND (verter.state = 'Success' OR verter.state = NULL)
+		),
+	pr2 AS (SELECT peers.nickname FROM checks 
+        JOIN peers ON checks.peer = peers.nickname
+        JOIN p2p ON p2p."Check" = checks.id
+		FULL JOIN verter ON verter."Check" = checks.id
+		WHERE task =task2_name AND p2p.state = 'Success' 
+		AND (verter.state = 'Success' OR verter.state = NULL)
+		),
+	pr3 AS (SELECT peers.nickname FROM checks 
+        JOIN peers ON checks.peer = peers.nickname
+        JOIN p2p ON p2p."Check" = checks.id
+		FULL JOIN verter ON verter."Check" = checks.id
+		WHERE task =task3_name AND p2p.state = 'Success' 
+		AND (verter.state = 'Success' OR verter.state = NULL)
+		),
+	pr12 AS (SELECT * FROM pr1
+		UNION
+		SELECT * FROM pr2)
+SELECT pr12.nickname FROM pr12
+JOIN pr3 ON pr12.nickname != pr3.nickname;
+END;
+$$ LANGUAGE plpgsql;
+
+-- BEGIN; 
+-- CALL proc_peer_made_two_tasks_from_tree('C2_SimpleBashUtils', 'C4_s21_math', 'C5_s21_decimal','res');
+-- FETCH ALL FROM "res";
+-- END;
