@@ -98,16 +98,16 @@ $$ LANGUAGE plpgsql;
 -- FETCH ALL FROM "res";
 -- END;
 
-select date, task, count(2) cnt
-  from checks
- group by date, task
- having (date,count(1))=
-  (
-   select date, count(1) from checks
-    where task =(select date from checks group by date order by count(1) desc limit 1)
-    group by date, task
-    order by count(2) desc
-)
+-- select date, task, count(2) cnt
+--   from checks
+--  group by date, task
+--  having (date,count(1))=
+--   (
+--    select date, count(1) from checks
+--     where task =(select date from checks group by date order by count(1) desc limit 1)
+--     group by date, task
+--     order by count(2) desc
+-- )
 
 -- 7) Найти всех пиров, выполнивших весь заданный блок задач и дату завершения последнего задания
 
@@ -115,20 +115,29 @@ CREATE OR REPLACE PROCEDURE proc_peer_closed_block(task_block varchar, res REFCU
 AS $$
 BEGIN
     OPEN res FOR
-        SELECT title 
-        FROM tasks
-        WHERE title ~ CONCAT('^', task_block, '[0-9]+_');
+            WITH block AS (SELECT title 
+                            FROM tasks
+                            WHERE title ~ CONCAT('^', task_block, '[0-9]+_')),
+                 success AS (SELECT peer, task, date
+                            FROM p2p
+                            JOIN checks ON p2p."Check" = checks.id
+                            JOIN verter ON verter."Check" = checks.id
+                            WHERE p2p.state = 'Success'
+                            AND (verter.state = 'Success' OR verter.state = NULL);)
+        ;
 END;
 $$ LANGUAGE plpgsql;
 
--- BEGIN; 
--- CALL proc_peer_closed_block('SQL', 'res');
--- FETCH ALL FROM "res";
--- END;
+BEGIN; 
+CALL proc_peer_closed_block('C', 'res');
+FETCH ALL FROM "res";
+END;
 
-SELECT * FROM p2p
+SELECT p2p.id, checks.peer, checks.task, row_number() over (partition by checks.peer order by checks.task) FROM p2p
 JOIN checks ON p2p."Check" = checks.id
-WHERE state = 'Success';
+JOIN verter ON verter."Check" = checks.id
+WHERE p2p.state = 'Success'
+AND (verter.state = 'Success' OR verter.state = NULL);
 
 -- 8) Определить, к какому пиру стоит идти на проверку каждому обучающемуся
 
