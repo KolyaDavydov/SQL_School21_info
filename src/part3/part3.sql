@@ -1,4 +1,4 @@
-<<<<<<< src/part3/part3.sql
+
 -- Функция, возвращающая таблицу TransferredPoints в более человекочитаемом виде
 
 CREATE OR REPLACE FUNCTION fnc_transferred_points() RETURNS TABLE(Peer1 varchar, Peer2 varchar, PointsAmount integer)
@@ -128,6 +128,28 @@ BEGIN
         ;
 END;
 $$ LANGUAGE plpgsql;
+
+/* ЗАКОМЕНТИРОВАННЫЙ ВАРИАНТ СЕДЬМОГО ЗАДАНИЯ С ДОПОЛНЕНИЕМ!!! НА РАССМОТРЕНИЕ
+
+
+CREATE OR REPLACE PROCEDURE proc_peer_closed_block(task_block varchar, res REFCURSOR) 
+AS $$
+BEGIN
+    OPEN res FOR
+		WITH block AS (SELECT title 
+									FROM tasks
+									WHERE title ~ CONCAT('^', 'C', '[0-9]+_')),
+						success AS (SELECT peer, task, date
+									FROM p2p
+									JOIN checks ON p2p."Check" = checks.id
+									JOIN verter ON verter."Check" = checks.id
+									WHERE p2p.state = 'Success'
+									AND (verter.state = 'Success' OR verter.state = NULL))
+					SELECT peer, date FROM success
+					WHERE task = (SELECT max(title) FROM block);
+END;
+$$ LANGUAGE plpgsql;
+*/
 
 BEGIN; 
 CALL proc_peer_closed_block('C', 'res');
@@ -263,6 +285,168 @@ $$ LANGUAGE plpgsql;
 -- FETCH ALL FROM "res";
 -- END;
 
+/*3_12. Используя рекурсивное обобщенное табличное выражение, для каждой задачи вывести кол-во предшествующих ей задач
+То есть сколько задач нужно выполнить, исходя из условий входа, чтобы получить доступ к текущей. 
+Формат вывода: название задачи, количество предшествующих
+*/
+DROP PROCEDURE IF EXISTS proc_count_parent_tasks CASCADE;
+CREATE OR REPLACE PROCEDURE proc_count_parent_tasks(refcurs REFCURSOR)
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			WITH RECURSIVE parent AS
+				(SELECT
+					(SELECT	title
+					FROM tasks
+					WHERE parenttask IS NULL) AS Task,
+				0 AS PrevCount
+				UNION ALL
+				SELECT
+					t.title,
+					PrevCount + 1
+				FROM parent p
+				JOIN tasks t ON t."parenttask" = p.Task)
+			SELECT *
+			FROM parent;
+	END;
+$$ LANGUAGE plpgsql;
+-- вызов процедуры для проверки 3.12
+--  BEGIN;
+-- 	CALL proc_count_parent_tasks('refcurs');
+-- 	FETCH ALL FROM "refcurs";
+--  END;
+
+/* 3-13. Найти "удачные" для проверок дни. День считается "удачным", если в нем есть хотя бы N идущих подряд успешных проверки
+Параметры процедуры: количество идущих подряд успешных проверок N. 
+Временем проверки считать время начала P2P этапа. 
+Под идущими подряд успешными проверками подразумеваются успешные проверки, между которыми нет неуспешных. 
+При этом кол-во опыта за каждую из этих проверок должно быть не меньше 80% от максимального. 
+Формат вывода: список дней
+*/
+DROP PROCEDURE IF EXISTS proc_lucky_day CASCADE;
+CREATE OR REPLACE PROCEDURE proc_lucky_day(N int, refcurs REFCURSOR)
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			WITH result AS
+				(SELECT
+					checks.id AS checks_id,
+					p2p.id AS p2p_id,
+					date,
+					p2p.time AS time,
+					p2p.state AS p2p_state,
+					verter.state AS vert_state,
+					(xpamount * 100 / maxxp) AS percent_xp
+				FROM checks
+				JOIN p2p ON checks.id = p2p."Check"
+				LEFT JOIN verter ON checks.id = verter."Check"
+				LEFT JOIN xp ON p2p."Check" = xp."Check"
+				JOIN tasks ON task = title
+				WHERE p2p.state != 'Start' AND (verter.state = 'Success' OR verter.state = 'Failure' OR verter.state IS NULL)
+				ORDER BY date, p2p.time),
+            result_all AS
+            	(SELECT
+            		ROW_NUMBER() OVER (PARTITION BY (date) ORDER BY time) AS row_num,
+            		*
+            	FROM result),
+            result_only_success AS
+            	(SELECT
+            		ROW_NUMBER() OVER (PARTITION BY (date) ORDER BY time) AS row2_num,
+            		*
+            	FROM result_all
+            	WHERE p2p_state = 'Success' AND (vert_state = 'Success' OR vert_state IS NULL) AND percent_xp >= 80)
+			SELECT date
+			FROM result_only_success
+			WHERE row2_num - row_num = 0
+			GROUP BY date
+			HAVING count(*) >= N;
+	END;
+$$ LANGUAGE plpgsql;
+-- вызов процедуры для проверки 3.13
+--  BEGIN;
+--  	CALL proc_lucky_day(1, 'refcurs');
+--  	FETCH ALL FROM "refcurs";
+--  END;
+
+
+/* 3-14. Определить пира с наибольшим количеством XP
+Формат вывода: ник пира, количество XP
+*/
+DROP PROCEDURE IF EXISTS proc_peer_max_xp CASCADE;
+CREATE OR REPLACE PROCEDURE proc_peer_max_xp(refcurs REFCURSOR DEFAULT 'refcurs')
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			SELECT
+				peer,
+				sum(xpamount) AS XP
+			FROM xp
+			JOIN checks ON xp."Check"=checks.id
+			GROUP BY peer
+			ORDER BY XP DESC
+			LIMIT 1;
+	END;
+$$ LANGUAGE plpgsql;
+-- вызов процедуры для проверки 3.14
+-- BEGIN;
+-- 	CALL proc_peer_max_xp();
+-- 	FETCH ALL FROM "refcurs";
+-- END;
+
+/* 3-15. Определить пиров, приходивших раньше заданного времени не менее N раз за всё время
+Параметры процедуры: время, количество раз N. 
+Формат вывода: список пиров
+*/
+DROP PROCEDURE IF EXISTS proc_peer_come_before CASCADE;
+CREATE OR REPLACE PROCEDURE proc_peer_come_before(T time, M int, refcurs REFCURSOR DEFAULT 'refcurs')
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			SELECT peer
+			FROM (SELECT
+					peer,
+					count(state) AS counts
+				FROM timetracking
+				WHERE state = 1 AND time < T
+				GROUP BY peer) AS come_peer
+			WHERE counts >= M;
+	END;
+$$ LANGUAGE plpgsql;
+
+-- вызов процедуры для проверки 3.15
+-- BEGIN;
+--	 CALL proc_peer_come_before('09:00:00'::time, 1);
+--	 FETCH ALL FROM "refcurs";
+-- END;
+
+/* 3-16. Определить пиров, выходивших за последние N дней из кампуса больше M раз
+Параметры процедуры: количество дней N, количество раз M. 
+Формат вывода: список пиров
+*/
+DROP PROCEDURE IF EXISTS proc_count_out_of_campus CASCADE;
+CREATE OR REPLACE PROCEDURE proc_count_out_of_campus(N int, M int, refcurs REFCURSOR)
+AS $$
+	BEGIN
+		OPEN refcurs FOR
+			WITH left_campus AS (
+				SELECT 
+					peer,
+					date
+				FROM timetracking
+				WHERE state = 2 AND (current_date - date) < N
+				GROUP BY peer, date)
+			SELECT peer FROM left_campus
+			GROUP BY peer
+			HAVING count(peer) > M;
+	END;
+$$ LANGUAGE plpgsql;
+
+-- вызов процедуры для проверки 3.16
+-- BEGIN;
+-- 	CALL proc_count_out_of_campus(360, 1, 'refcurs');
+-- 	FETCH ALL FROM "refcurs";
+-- END;
+
 /* 3-17. Определить для каждого месяца процент ранних входов
 Для каждого месяца посчитать, сколько раз люди, родившиеся в этот месяц, приходили в кампус за всё время (будем называть это общим числом входов). 
 Для каждого месяца посчитать, сколько раз люди, родившиеся в этот месяц, приходили в кампус раньше 12:00 за всё время (будем называть это числом ранних входов). 
@@ -324,167 +508,3 @@ $$ LANGUAGE plpgsql;
 -- 	CALL proc_percent_of_entry_early('refcurs');
 -- 	FETCH ALL FROM "refcurs";
 -- END;
-
-
-/* 3-16. Определить пиров, выходивших за последние N дней из кампуса больше M раз
-Параметры процедуры: количество дней N, количество раз M. 
-Формат вывода: список пиров
-*/
-DROP PROCEDURE IF EXISTS proc_count_out_of_campus CASCADE;
-CREATE OR REPLACE PROCEDURE proc_count_out_of_campus(N int, M int, refcurs REFCURSOR)
-AS $$
-	BEGIN
-		OPEN refcurs FOR
-			WITH left_campus AS (
-				SELECT 
-					peer,
-					date
-				FROM timetracking
-				WHERE state = 2 AND (current_date - date) < N
-				GROUP BY peer, date)
-			SELECT peer FROM left_campus
-			GROUP BY peer
-			HAVING count(peer) > M;
-	END;
-$$ LANGUAGE plpgsql;
-
--- вызов процедуры для проверки 3.16
--- BEGIN;
--- 	CALL proc_count_out_of_campus(360, 1, 'refcurs');
--- 	FETCH ALL FROM "refcurs";
--- END;
-
-
-/* 3-15. Определить пиров, приходивших раньше заданного времени не менее N раз за всё время
-Параметры процедуры: время, количество раз N. 
-Формат вывода: список пиров
-*/
-DROP PROCEDURE IF EXISTS proc_peer_come_before CASCADE;
-CREATE OR REPLACE PROCEDURE proc_peer_come_before(T time, M int, refcurs REFCURSOR DEFAULT 'refcurs')
-AS $$
-	BEGIN
-		OPEN refcurs FOR
-			SELECT peer
-			FROM (SELECT
-					peer,
-					count(state) AS counts
-				FROM timetracking
-				WHERE state = 1 AND time < T
-				GROUP BY peer) AS come_peer
-			WHERE counts >= M;
-	END;
-$$ LANGUAGE plpgsql;
-
--- вызов процедуры для проверки 3.15
--- BEGIN;
---	 CALL proc_peer_come_before('09:00:00'::time, 1);
---	 FETCH ALL FROM "refcurs";
--- END;
-
-/* 3-14. Определить пира с наибольшим количеством XP
-Формат вывода: ник пира, количество XP
-*/
-DROP PROCEDURE IF EXISTS proc_peer_max_xp CASCADE;
-CREATE OR REPLACE PROCEDURE proc_peer_max_xp(refcurs REFCURSOR DEFAULT 'refcurs')
-AS $$
-	BEGIN
-		OPEN refcurs FOR
-			SELECT
-				peer,
-				sum(xpamount) AS XP
-			FROM xp
-			JOIN checks ON xp."Check"=checks.id
-			GROUP BY peer
-			ORDER BY XP DESC
-			LIMIT 1;
-	END;
-$$ LANGUAGE plpgsql;
--- вызов процедуры для проверки 3.14
--- BEGIN;
--- 	CALL proc_peer_max_xp();
--- 	FETCH ALL FROM "refcurs";
--- END;
-
-/* 3-13. Найти "удачные" для проверок дни. День считается "удачным", если в нем есть хотя бы N идущих подряд успешных проверки
-Параметры процедуры: количество идущих подряд успешных проверок N. 
-Временем проверки считать время начала P2P этапа. 
-Под идущими подряд успешными проверками подразумеваются успешные проверки, между которыми нет неуспешных. 
-При этом кол-во опыта за каждую из этих проверок должно быть не меньше 80% от максимального. 
-Формат вывода: список дней
-*/
-DROP PROCEDURE IF EXISTS proc_lucky_day CASCADE;
-CREATE OR REPLACE PROCEDURE proc_lucky_day(N int, refcurs REFCURSOR)
-AS $$
-	BEGIN
-		OPEN refcurs FOR
-			WITH result AS
-				(SELECT
-					checks.id AS checks_id,
-					p2p.id AS p2p_id,
-					date,
-					p2p.time AS time,
-					p2p.state AS p2p_state,
-					verter.state AS vert_state,
-					(xpamount * 100 / maxxp) AS percent_xp
-				FROM checks
-				JOIN p2p ON checks.id = p2p."Check"
-				LEFT JOIN verter ON checks.id = verter."Check"
-				LEFT JOIN xp ON p2p."Check" = xp."Check"
-				JOIN tasks ON task = title
-				WHERE p2p.state != 'Start' AND (verter.state = 'Success' OR verter.state = 'Failure' OR verter.state IS NULL)
-				ORDER BY date, p2p.time),
-            result_all AS
-            	(SELECT
-            		ROW_NUMBER() OVER (PARTITION BY (date) ORDER BY time) AS row_num,
-            		*
-            	FROM result),
-            result_only_success AS
-            	(SELECT
-            		ROW_NUMBER() OVER (PARTITION BY (date) ORDER BY time) AS row2_num,
-            		*
-            	FROM result_all
-            	WHERE p2p_state = 'Success' AND (vert_state = 'Success' OR vert_state IS NULL) AND percent_xp >= 80)
-			SELECT date
-			FROM result_only_success
-			WHERE row2_num - row_num = 0
-			GROUP BY date
-			HAVING count(*) >= N;
-	END;
-$$ LANGUAGE plpgsql;
--- вызов процедуры для проверки 3.13
---  BEGIN;
---  	CALL proc_lucky_day(1, 'refcurs');
---  	FETCH ALL FROM "refcurs";
---  END;
-
-/*3_12. Используя рекурсивное обобщенное табличное выражение, для каждой задачи вывести кол-во предшествующих ей задач
-То есть сколько задач нужно выполнить, исходя из условий входа, чтобы получить доступ к текущей. 
-Формат вывода: название задачи, количество предшествующих
-*/
-DROP PROCEDURE IF EXISTS proc_count_parent_tasks CASCADE;
-CREATE OR REPLACE PROCEDURE proc_count_parent_tasks(refcurs REFCURSOR)
-AS $$
-	BEGIN
-		OPEN refcurs FOR
-			WITH RECURSIVE parent AS
-				(SELECT
-					(SELECT	title
-					FROM tasks
-					WHERE parenttask IS NULL) AS Task,
-				0 AS PrevCount
-				UNION ALL
-				SELECT
-					t.title,
-					PrevCount + 1
-				FROM parent p
-				JOIN tasks t ON t."parenttask" = p.Task)
-			SELECT *
-			FROM parent;
-	END;
-$$ LANGUAGE plpgsql;
--- вызов процедуры для проверки 3.12
---  BEGIN;
--- 	CALL proc_count_parent_tasks('refcurs');
--- 	FETCH ALL FROM "refcurs";
---  END;
->>>>>>> src/part3/part3.sql

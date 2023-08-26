@@ -1,3 +1,20 @@
+-- Создание БД и подключение к ней
+-- 'psql -U postgres' (заходим в постгрес под пользователем postgres)
+-- 'CREATE DATABASE s21_info_4;' (создаем базу данных)
+-- '\c s21_info_4' (подключаемся к базе данных)
+-- Запускаем скрипт part1.sql и part3.sql
+-- И добавляем таблички:
+
+CREATE TABLE "TableName_1" (
+    column_1 VARCHAR,
+    column_2 INT
+);
+
+CREATE TABLE "TableName_2" (
+    column_1 VARCHAR,
+    column_2 INT
+);
+
 -- 1) Создать хранимую процедуру, которая, не уничтожая базу данных, уничтожает все те таблицы текущей базы данных, имена которых начинаются с фразы 'TableName'.
 
 CREATE OR REPLACE PROCEDURE proc_remove_tables_by_name() 
