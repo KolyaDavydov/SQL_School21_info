@@ -15,7 +15,7 @@ LANGUAGE SQL;
 -- FROM fnc_transferred_points();
 
 -- 2) Функция, которая возвращает таблицу вида: ник пользователя, название проверенного задания, кол-во полученного XP
--- TODO Проверить Одна задача может быть успешно выполнена несколько раз. В таком случае в таблицу включать все успешные проверки.
+
 CREATE OR REPLACE FUNCTION fnc_XP_per_project() RETURNS TABLE(Peer varchar, Task varchar, XP integer)
 AS $$ SELECT  peers.nickname AS Peer, checks.task AS Task, xp.xpamount AS XP FROM xp
 JOIN checks ON xp."Check"=checks.id
@@ -227,7 +227,7 @@ $$ LANGUAGE plpgsql;
 -- END;
 
 -- 11) Определить всех пиров, которые сдали заданные задания 1 и 2, но не сдали задание 3
--- TODO можно написать функцию, чтобы сократить одинаковый код
+
 CREATE OR REPLACE PROCEDURE proc_peer_made_two_tasks_from_tree(IN task1_name VARCHAR, task2_name VARCHAR, task3_name VARCHAR, res REFCURSOR) 
 AS $$
 BEGIN
@@ -253,18 +253,17 @@ WITH pr1 AS (SELECT peers.nickname FROM checks
 		WHERE task =task3_name AND p2p.state = 'Success' 
 		AND (verter.state = 'Success' OR verter.state = NULL)
 		),
-	pr12 AS (SELECT * FROM pr1
-		UNION
-		SELECT * FROM pr2)
+	pr12 AS (SELECT pr1.nickname FROM pr1		
+			 JOIN pr2 ON pr1.nickname = pr2.nickname )
 SELECT pr12.nickname FROM pr12
 JOIN pr3 ON pr12.nickname != pr3.nickname;
 END;
 $$ LANGUAGE plpgsql;
 
--- BEGIN; 
--- CALL proc_peer_made_two_tasks_from_tree('C2_SimpleBashUtils', 'C4_s21_math', 'C5_s21_decimal','res');
--- FETCH ALL FROM "res";
--- END;
+BEGIN; 
+CALL proc_peer_made_two_tasks_from_tree('C2_SimpleBashUtils', 'C4_s21_math', 'C5_s21_decimal','res');
+FETCH ALL FROM "res";
+END;
 
 /*3_12. Используя рекурсивное обобщенное табличное выражение, для каждой задачи вывести кол-во предшествующих ей задач
 То есть сколько задач нужно выполнить, исходя из условий входа, чтобы получить доступ к текущей. 
