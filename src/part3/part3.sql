@@ -11,8 +11,8 @@ GROUP BY Peer1, Peer2
 ORDER BY Peer1, Peer2; $$
 LANGUAGE SQL;
 
-SELECT *
-FROM fnc_transferred_points();
+-- SELECT *
+-- FROM fnc_transferred_points();
 
 -- 2) Функция, которая возвращает таблицу вида: ник пользователя, название проверенного задания, кол-во полученного XP
 -- TODO Проверить Одна задача может быть успешно выполнена несколько раз. В таком случае в таблицу включать все успешные проверки.
@@ -22,8 +22,8 @@ JOIN checks ON xp."Check"=checks.id
 JOIN peers ON checks.peer=peers.nickname $$
 LANGUAGE SQL;
 
-SELECT *
-FROM fnc_XP_per_project();
+-- SELECT *
+-- FROM fnc_XP_per_project();
 
 -- 3) Функция, определяющая пиров, которые не выходили из кампуса в течение всего дня
 
@@ -34,11 +34,11 @@ FROM
 FROM timetracking
 WHERE date=ondate
 GROUP BY Peer) AS ino
-WHERE ino.in_out >3; $$
+WHERE ino.in_out =3; $$
 LANGUAGE SQL;
 
-SELECT *
-FROM fnc_noexit_peers_ondate('2023-02-01');
+-- SELECT *
+-- FROM fnc_noexit_peers_ondate('2023-02-01');
 
 -- 4) Процедура для подсчёта изменений в количестве пир поинтов каждого пира по таблице TransferredPoints
 
@@ -55,10 +55,11 @@ BEGIN
         ORDER BY PointsChange DESC;
 END;
 $$ LANGUAGE plpgsql;
-BEGIN; 
-CALL proc_peer_points_change('res');
-FETCH ALL FROM "res";
-END;
+
+-- BEGIN; 
+-- CALL proc_peer_points_change('res');
+-- FETCH ALL FROM "res";
+-- END;
 
 -- 5) Посчитать изменение в количестве пир поинтов каждого пира по таблице, возвращаемой первой функцией из Part 3
 
@@ -72,10 +73,10 @@ ORDER BY PointsChange DESC;
 END;
 $$ LANGUAGE plpgsql;
 
-BEGIN; 
-CALL proc_peer_points_change_by_func('res');
-FETCH ALL FROM "res";
-END;
+-- BEGIN; 
+-- CALL proc_peer_points_change_by_func('res');
+-- FETCH ALL FROM "res";
+-- END;
 
 -- 6) Определить самое часто проверяемое задание за каждый день
 
@@ -116,26 +117,6 @@ CREATE OR REPLACE PROCEDURE proc_peer_closed_block(task_block varchar, res REFCU
 AS $$
 BEGIN
     OPEN res FOR
-            WITH block AS (SELECT title 
-                            FROM tasks
-                            WHERE title ~ CONCAT('^', task_block, '[0-9]+_')),
-                 success AS (SELECT peer, task, date
-                            FROM p2p
-                            JOIN checks ON p2p."Check" = checks.id
-                            JOIN verter ON verter."Check" = checks.id
-                            WHERE p2p.state = 'Success'
-                            AND (verter.state = 'Success' OR verter.state = NULL);)
-        ;
-END;
-$$ LANGUAGE plpgsql;
-
-/* ЗАКОМЕНТИРОВАННЫЙ ВАРИАНТ СЕДЬМОГО ЗАДАНИЯ С ДОПОЛНЕНИЕМ!!! НА РАССМОТРЕНИЕ
-
-
-CREATE OR REPLACE PROCEDURE proc_peer_closed_block(task_block varchar, res REFCURSOR) 
-AS $$
-BEGIN
-    OPEN res FOR
 		WITH block AS (SELECT title 
 									FROM tasks
 									WHERE title ~ CONCAT('^', 'C', '[0-9]+_')),
@@ -145,16 +126,15 @@ BEGIN
 									JOIN verter ON verter."Check" = checks.id
 									WHERE p2p.state = 'Success'
 									AND (verter.state = 'Success' OR verter.state = NULL))
-					SELECT peer, date FROM success
+					SELECT peer, date as Day FROM success
 					WHERE task = (SELECT max(title) FROM block);
 END;
 $$ LANGUAGE plpgsql;
-*/
 
-BEGIN; 
-CALL proc_peer_closed_block('C', 'res');
-FETCH ALL FROM "res";
-END;
+-- BEGIN; 
+-- CALL proc_peer_closed_block('C', 'res');
+-- FETCH ALL FROM "res";
+-- END;
 
 SELECT p2p.id, checks.peer, checks.task, row_number() over (partition by checks.peer order by checks.task) FROM p2p
 JOIN checks ON p2p."Check" = checks.id
@@ -181,10 +161,11 @@ WITH fr AS (SELECT peer1, peer2 FROM friends
     WHERE row_number =1;
 END;
 $$ LANGUAGE plpgsql;
-BEGIN; 
-CALL proc_recomend_peer_for_checks('res');
-FETCH ALL FROM "res";
-END;
+
+-- BEGIN; 
+-- CALL proc_recomend_peer_for_checks('res');
+-- FETCH ALL FROM "res";
+-- END;
 
 -- 9) Определить процент пиров, которые:
 -- Приступили только к блоку 1
@@ -310,6 +291,7 @@ AS $$
 			FROM parent;
 	END;
 $$ LANGUAGE plpgsql;
+
 -- вызов процедуры для проверки 3.12
 --  BEGIN;
 -- 	CALL proc_count_parent_tasks('refcurs');
