@@ -401,12 +401,14 @@ AS $$
 	BEGIN
 		OPEN refcurs FOR
 			WITH left_campus AS (
-				SELECT 
-					peer,
-					date
-				FROM timetracking
-				WHERE state = 2 AND (current_date - date) < N
-				GROUP BY peer, date)
+				SELECT *
+				FROM (SELECT
+						timetracking.peer AS peer,
+						date,
+						sum(state) AS in_out
+					FROM timetracking
+					GROUP BY Peer, date) AS ino
+					WHERE ino.in_out > 3 AND (current_date - date) < N)
 			SELECT peer FROM left_campus
 			GROUP BY peer
 			HAVING count(peer) > M;
