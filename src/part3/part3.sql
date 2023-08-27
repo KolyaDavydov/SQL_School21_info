@@ -87,29 +87,20 @@ BEGIN
         WITH checks_count AS (SELECT date AS Day, task AS Task, COUNT(task) 
         FROM checks
         GROUP BY date, task
-        ORDER BY count),
-        sort_checks AS (SELECT Day, Task, ROW_NUMBER() OVER(partition BY Day ORDER BY count DESC) 
-        FROM checks_count)
-        SELECT Day, Task FROM sort_checks
-        WHERE row_number =1;
+        ORDER BY date)
+        SELECT checks_count.day,
+			checks_count.task
+		FROM checks_count
+			LEFT JOIN checks_count cc ON cc.task != checks_count.task
+				and cc.day = checks_count.day AND cc.count > checks_count.count
+		WHERE cc.day IS NULL;
 END;
 $$ LANGUAGE plpgsql;
 
--- BEGIN; 
--- CALL proc_most_checked_task('res');
--- FETCH ALL FROM "res";
--- END;
-
--- select date, task, count(2) cnt
---   from checks
---  group by date, task
---  having (date,count(1))=
---   (
---    select date, count(1) from checks
---     where task =(select date from checks group by date order by count(1) desc limit 1)
---     group by date, task
---     order by count(2) desc
--- )
+BEGIN; 
+CALL proc_most_checked_task('res');
+FETCH ALL FROM "res";
+END;
 
 -- 7) Найти всех пиров, выполнивших весь заданный блок задач и дату завершения последнего задания
 
