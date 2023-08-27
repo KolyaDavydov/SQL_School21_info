@@ -97,10 +97,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-BEGIN; 
-CALL proc_most_checked_task('res');
-FETCH ALL FROM "res";
-END;
+-- BEGIN; 
+-- CALL proc_most_checked_task('res');
+-- FETCH ALL FROM "res";
+-- END;
 
 -- 7) Найти всех пиров, выполнивших весь заданный блок задач и дату завершения последнего задания
 
@@ -148,7 +148,7 @@ WITH fr AS (SELECT peer1, peer2 FROM friends
         ORDER BY peer2, count DESC),
     recom AS (SELECT peer2, recommendedpeer, ROW_NUMBER() OVER(partition BY peer2 ORDER BY count DESC) FROM rec
         WHERE peer2 != recommendedpeer) 
-    SELECT peer2, recommendedpeer from recom
+    SELECT peer2 AS Peer, recommendedpeer from recom
     WHERE row_number =1;
 END;
 $$ LANGUAGE plpgsql;
@@ -206,8 +206,8 @@ BEGIN
         JOIN p2p ON p2p."Check" = pr.id), 
         failure AS (SELECT COUNT(case state when 'Failure' then 1 else null end) FROM pr
         JOIN p2p ON p2p."Check" = pr.id)
-        SELECT round(sum(success.count)/(sum(success.count)+sum(failure.count))*100, 0),
-        round(sum(failure.count)/(sum(success.count)+sum(failure.count))*100, 0)
+        SELECT round(sum(success.count)/(sum(success.count)+sum(failure.count))*100, 0) AS "SuccessfulChecks",
+        round(sum(failure.count)/(sum(success.count)+sum(failure.count))*100, 0) AS "UnsuccessfulChecks"
         FROM success, failure;
 END;
 $$ LANGUAGE plpgsql;
@@ -251,10 +251,10 @@ JOIN pr3 ON pr12.nickname != pr3.nickname;
 END;
 $$ LANGUAGE plpgsql;
 
-BEGIN; 
-CALL proc_peer_made_two_tasks_from_tree('C2_SimpleBashUtils', 'C4_s21_math', 'C5_s21_decimal','res');
-FETCH ALL FROM "res";
-END;
+-- BEGIN; 
+-- CALL proc_peer_made_two_tasks_from_tree('C2_SimpleBashUtils', 'C4_s21_math', 'C5_s21_decimal','res');
+-- FETCH ALL FROM "res";
+-- END;
 
 /*3_12. Используя рекурсивное обобщенное табличное выражение, для каждой задачи вывести кол-во предшествующих ей задач
 То есть сколько задач нужно выполнить, исходя из условий входа, чтобы получить доступ к текущей. 
@@ -344,7 +344,7 @@ $$ LANGUAGE plpgsql;
 /* 3-14. Определить пира с наибольшим количеством XP
 Формат вывода: ник пира, количество XP
 */
-DROP PROCEDURE IF EXISTS proc_peer_max_xp CASCADE;
+-- DROP PROCEDURE IF EXISTS proc_peer_max_xp CASCADE;
 CREATE OR REPLACE PROCEDURE proc_peer_max_xp(refcurs REFCURSOR DEFAULT 'refcurs')
 AS $$
 	BEGIN
@@ -369,7 +369,7 @@ $$ LANGUAGE plpgsql;
 Параметры процедуры: время, количество раз N. 
 Формат вывода: список пиров
 */
-DROP PROCEDURE IF EXISTS proc_peer_come_before CASCADE;
+-- DROP PROCEDURE IF EXISTS proc_peer_come_before CASCADE;
 CREATE OR REPLACE PROCEDURE proc_peer_come_before(T time, M int, refcurs REFCURSOR DEFAULT 'refcurs')
 AS $$
 	BEGIN
@@ -425,7 +425,7 @@ $$ LANGUAGE plpgsql;
 Для каждого месяца посчитать процент ранних входов в кампус относительно общего числа входов. 
 Формат вывода: месяц, процент ранних входов
  * */
-DROP PROCEDURE IF EXISTS proc_percent_of_entry_early CASCADE;
+-- DROP PROCEDURE IF EXISTS proc_percent_of_entry_early CASCADE;
 CREATE OR REPLACE PROCEDURE proc_percent_of_entry_early(refcurs REFCURSOR)
 AS $$
 	BEGIN
